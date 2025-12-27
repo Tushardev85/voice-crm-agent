@@ -4,8 +4,7 @@ from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.services.openai.llm import OpenAILLMService
-from pipecat.services.deepgram.stt import DeepgramSTTService
-from pipecat.transports.network.fastapi_websocket import (
+from pipecat.transports.websocket.fastapi import (
     FastAPIWebsocketTransport,
     FastAPIWebsocketParams,
 )
@@ -13,23 +12,18 @@ from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.serializers.twilio import TwilioFrameSerializer
 from pipecat.services.elevenlabs.tts import ElevenLabsTTSService
 from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
-# import sys
-
+from pipecat.services.cartesia.stt import CartesiaSTTService
 from loguru import logger
-
 from dotenv import load_dotenv
-
-# from voicemail_utilis import switch_to_voicemail_response
 
 load_dotenv(override=True)
 
 logger.remove(0)
-# only use it for debugging
-# logger.add(sys.stderr, level="DEBUG")
 
-async def run_bot(websocket_client, stream_sid, call_sid, account_sid):
+async def run_bot(websocket_client, stream_sid, call_sid, account_sid, prompt: str, agent_name: str = "AI Assistant"):
     try:
-        print("run_bot method called.........................................................");
+        print("run_bot method called........................................................."); 
+        print(f"Using prompt for agent '{agent_name}': {prompt[:100]}...")
 
         transport = FastAPIWebsocketTransport(
             websocket=websocket_client,
@@ -53,12 +47,9 @@ async def run_bot(websocket_client, stream_sid, call_sid, account_sid):
             model="gpt-4o-mini",
         )
 
-        # Initialize STT service with optimized settings
-        stt = DeepgramSTTService(
-            api_key=os.getenv("DEEPGRAM_API_KEY"),
-            model="nova-3",
-            detect_language=True,
-            language='multi'
+        # Initialize STT service
+        stt = CartesiaSTTService(
+            api_key=os.getenv("CARTESIA_API_KEY"),
         )
 
         # Initialize TTS service with optimized settings
@@ -67,8 +58,8 @@ async def run_bot(websocket_client, stream_sid, call_sid, account_sid):
             voice_id="9BWtsMINqrJLrRacOk9x",
         )
 
-        # Initialize context based on LLM type
-        messages = [{"role": "system", "content": "You are a helpful assistant."}]
+        # Initialize context with the processed prompt from Redis
+        messages = [{"role": "system", "content": prompt}]
 
         context = OpenAILLMContext(messages=messages)
         context_aggregator = llm.create_context_aggregator(context)
