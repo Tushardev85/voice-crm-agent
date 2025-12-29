@@ -1,28 +1,76 @@
-# Copyright 2021 Google LLC
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
-# The .dockerignore file excludes files from the container build process
-# when building with the Docker CLI.
-#
-# https://docs.docker.com/engine/reference/builder/#dockerignore-file
-
-# Exclude locally installed dependencies
+# Virtual environments
 venv/
+env/
+ENV/
+.venv
 
-# Exclude "build-time" ignore files.
-.dockerignore
-.gcloudignore
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
 
-# Exclude git history and configuration.
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Git
+.git/
 .gitignore
+.gitattributes
+
+# Docker
+.dockerignore
+Dockerfile
+docker-compose*.yml
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Testing
+test/
+tests/
+*.test
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Documentation
+*.md
+README*
+LICENSE
+docs/
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+renovate.json
+
+# Build files
+build/
+dist/
+*.egg-info/
+
+# Database (not needed since we removed DB)
+*.db
+*.sqlite
+*.sqlite3
+alembic/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Development tools
+.pre-commit-config.yaml
+requirements-test.txt

@@ -1,21 +1,27 @@
-Flask
-gunicorn
-sqlmodel
-psycopg2-binary
-requests
-structlog
-
-google-auth
-pipecat-ai[openai,silero,deepgram,together,deepseek,grok,groq,anthropic,google,elevenlabs]
+# Web Framework & Server
 fastapi[standard]
 uvicorn
-python-dotenv
+gunicorn>=21.2.0
+
+# Logging (used by utils/logging.py)
+structlog
+Flask
+
+# Voice/AI Services
+pipecat-ai[openai,silero,deepgram,together,deepseek,grok,groq,anthropic,google,elevenlabs,cartesia]
 loguru
-python-multipart
-google-cloud-storage
 twilio
+
+# Data & Cache
 redis
 
+# Utilities
+python-dotenv
+python-multipart
+requests
+google-auth
+
+# Development Tools
 black
 flake8
 pre-commit
