@@ -84,8 +84,10 @@ async def websocket_endpoint(websocket: WebSocket):
         
         # Extract data from Redis
         agent_id = redis_data.get("agent_id")
+        workspace_id = redis_data.get("workspace_id")
         prompt = redis_data.get("prompt")
         agent_name = redis_data.get("agent_name")
+        lead_id = redis_data.get("lead_id")
         
         if not agent_id or not prompt:
             print(f"Incomplete data in Redis for call {call_sid}")
@@ -94,7 +96,13 @@ async def websocket_endpoint(websocket: WebSocket):
         print(f"Agent validated: {agent_name} (ID: {agent_id})")
         print(f"Using processed prompt: {prompt[:100]}...")
 
-        # Pass prompt and metadata directly to run_bot
+        call_metadata = {
+            "agent_id": agent_id,
+            "workspace_id": workspace_id,
+            "lead_id": lead_id,
+            "call_sid": call_sid,
+        }
+
         await run_bot(
             websocket,
             call_data_start["streamSid"],
@@ -102,6 +110,7 @@ async def websocket_endpoint(websocket: WebSocket):
             call_data_start["accountSid"],
             prompt=prompt,
             agent_name=agent_name,
+            call_metadata=call_metadata,
         )
         
         # Cleanup Redis data

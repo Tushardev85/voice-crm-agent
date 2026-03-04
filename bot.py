@@ -1,4 +1,5 @@
 import os
+import json
 from pipecat.frames.frames import EndFrame, LLMMessagesFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
@@ -16,14 +17,26 @@ from pipecat.services.cartesia.stt import CartesiaSTTService
 from loguru import logger
 from dotenv import load_dotenv
 
+from tools import CRM_TOOLS, handle_tool_call
+
 load_dotenv(override=True)
 
 logger.remove(0)
 
-async def run_bot(websocket_client, stream_sid, call_sid, account_sid, prompt: str, agent_name: str = "AI Assistant"):
+async def run_bot(
+    websocket_client,
+    stream_sid,
+    call_sid,
+    account_sid,
+    prompt: str,
+    agent_name: str = "AI Assistant",
+    call_metadata: dict | None = None,
+):
     try:
-        print("run_bot method called........................................................."); 
+        print("run_bot method called.........................................................");
         print(f"Using prompt for agent '{agent_name}': {prompt[:100]}...")
+
+        metadata = call_metadata or {}
 
         transport = FastAPIWebsocketTransport(
             websocket=websocket_client,
@@ -47,19 +60,35 @@ async def run_bot(websocket_client, stream_sid, call_sid, account_sid, prompt: s
             model="gpt-4o-mini",
         )
 
-        # Initialize STT service
+        # Register CRM tools for function-calling
+        await llm.set_tools(CRM_TOOLS)
+
+        async def on_tool_call(function_name: str, tool_call_id: str, arguments: dict, llm, context, result_callback):
+            result = await handle_tool_call(function_name, arguments, metadata)
+            await result_callback(result)
+
+        llm.register_function("set_call_disposition", on_tool_call)
+        llm.register_function("schedule_callback", on_tool_call)
+        llm.register_function("log_conversation_summary", on_tool_call)
+
         stt = CartesiaSTTService(
             api_key=os.getenv("CARTESIA_API_KEY"),
         )
 
-        # Initialize TTS service with optimized settings
         tts = ElevenLabsTTSService(
-            api_key=os.getenv("ELEVENLABS_API_KEY"), 
+            api_key=os.getenv("ELEVENLABS_API_KEY"),
             voice_id="9BWtsMINqrJLrRacOk9x",
         )
 
-        # Initialize context with the processed prompt from Redis
-        messages = [{"role": "system", "content": prompt}]
+        # Append tool-calling instructions to the system prompt
+        tool_instructions = (
+            "\n\nYou have access to CRM tools. At the end of the conversation, "
+            "you MUST call log_conversation_summary to record what was discussed. "
+            "If the lead expresses a clear intent (interested, not interested, wants callback, etc.), "
+            "call set_call_disposition with the appropriate outcome. "
+            "If the lead requests a callback, call schedule_callback with their preferred date and time."
+        )
+        messages = [{"role": "system", "content": prompt + tool_instructions}]
 
         context = OpenAILLMContext(messages=messages)
         context_aggregator = llm.create_context_aggregator(context)
