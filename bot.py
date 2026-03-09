@@ -60,8 +60,8 @@ async def run_bot(
             model="gpt-4o-mini",
         )
 
-        # Register CRM tools for function-calling
-        await llm.set_tools(CRM_TOOLS)
+        # Register CRM tool handlers. Tool schemas are provided on the context
+        # for this Pipecat version.
 
         async def on_tool_call(function_name: str, tool_call_id: str, arguments: dict, llm, context, result_callback):
             result = await handle_tool_call(function_name, arguments, metadata)
@@ -83,14 +83,17 @@ async def run_bot(
         # Append tool-calling instructions to the system prompt
         tool_instructions = (
             "\n\nYou have access to CRM tools. At the end of the conversation, "
-            "you MUST call log_conversation_summary to record what was discussed. "
-            "If the lead expresses a clear intent (interested, not interested, wants callback, etc.), "
-            "call set_call_disposition with the appropriate outcome. "
-            "If the lead requests a callback, call schedule_callback with their preferred date and time."
+            "you MUST call log_conversation_summary to record what was discussed, and you MUST set one call outcome. "
+            "Use exactly one disposition path: "
+            "1) If lead asks for callback, call schedule_callback(callback_date, callback_time, notes) and do not call set_call_disposition after that. "
+            "2) If lead is not interested, call set_call_disposition with disposition='connected_not_interested'. "
+            "3) If lead is interested and clearly satisfies BANT (budget, authority, need, timing), call set_call_disposition with disposition='connected_qualified'. "
+            "4) If lead is interested but does not satisfy BANT, call set_call_disposition with disposition='connected_disqualified'. "
+            "If outcome is still unclear, ask follow-up questions before ending the call."
         )
         messages = [{"role": "system", "content": prompt + tool_instructions}]
 
-        context = OpenAILLMContext(messages=messages)
+        context = OpenAILLMContext(messages=messages, tools=CRM_TOOLS, tool_choice="auto")
         context_aggregator = llm.create_context_aggregator(context)
 
         tma_in = context_aggregator.user()

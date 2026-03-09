@@ -37,6 +37,12 @@ class RedisClient:
         try:
             client = cls.get_client()
             data = client.get(redis_key)
+            print("got some call data from Redis------------------------------", data)
+            if data:
+                print(
+                    "JSON loaded some call data from Redis------------------------------",
+                    json.loads(data),
+                )
             
             if data:
                 return json.loads(data)

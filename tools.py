@@ -18,12 +18,15 @@ logger = logging.getLogger(__name__)
 BACKEND_URL = os.getenv("BACKEND_URL", "https://app.finhubb.io")
 
 
-def _backend_headers(workspace_id: str) -> dict:
-    """Headers for backend API calls from the agent (service-level)."""
-    return {
+def _backend_headers(workspace_id: str, auth_header: Optional[str] = None) -> dict:
+    """Headers for backend API calls from the agent."""
+    headers = {
         "Content-Type": "application/json",
         "workspace-id": workspace_id,
     }
+    if auth_header:
+        headers["Authorization"] = auth_header
+    return headers
 
 
 CRM_TOOLS = [
@@ -123,21 +126,22 @@ async def handle_tool_call(
     """
     Execute a CRM tool call and return the result as a string for the LLM.
 
-    call_metadata should contain: lead_id, workspace_id, agent_id
+    call_metadata should contain: lead_id, workspace_id, agent_id, auth_header.
     """
     lead_id = call_metadata.get("lead_id")
     workspace_id = call_metadata.get("workspace_id")
+    auth_header = call_metadata.get("auth_header")
 
     if not workspace_id:
         return json.dumps({"status": "error", "message": "No workspace context available"})
 
     try:
         if function_name == "set_call_disposition":
-            return await _set_disposition(workspace_id, lead_id, arguments)
+            return await _set_disposition(workspace_id, lead_id, arguments, auth_header)
         elif function_name == "schedule_callback":
-            return await _schedule_callback(workspace_id, lead_id, arguments)
+            return await _schedule_callback(workspace_id, lead_id, arguments, auth_header)
         elif function_name == "log_conversation_summary":
-            return await _log_summary(workspace_id, lead_id, arguments)
+            return await _log_summary(workspace_id, lead_id, arguments, auth_header)
         else:
             return json.dumps({"status": "error", "message": f"Unknown function: {function_name}"})
     except Exception as e:
@@ -145,18 +149,29 @@ async def handle_tool_call(
         return json.dumps({"status": "error", "message": str(e)})
 
 
-async def _set_disposition(workspace_id: str, lead_id: Optional[str], args: dict) -> str:
+async def _set_disposition(
+    workspace_id: str,
+    lead_id: Optional[str],
+    args: dict,
+    auth_header: Optional[str],
+) -> str:
     if not lead_id:
         return json.dumps({"status": "skipped", "message": "No lead_id associated with this call"})
 
     payload = {
+        "lead_id": lead_id,
+        "channel": "call",
+        "type": "manual",
         "disposition": args["disposition"],
         "notes": args.get("notes"),
     }
+    if args.get("callback_datetime"):
+        payload["callback_datetime"] = args["callback_datetime"]
+
     try:
         resp = requests.post(
-            f"{BACKEND_URL}/api/v1/leads/{lead_id}/dispose",
-            headers=_backend_headers(workspace_id),
+            f"{BACKEND_URL}/api/v1/activities/",
+            headers=_backend_headers(workspace_id, auth_header),
             json=payload,
             timeout=10,
         )
@@ -167,33 +182,39 @@ async def _set_disposition(workspace_id: str, lead_id: Optional[str], args: dict
         return json.dumps({"status": "error", "message": str(e)})
 
 
-async def _schedule_callback(workspace_id: str, lead_id: Optional[str], args: dict) -> str:
+async def _schedule_callback(
+    workspace_id: str,
+    lead_id: Optional[str],
+    args: dict,
+    auth_header: Optional[str],
+) -> str:
     if not lead_id:
         return json.dumps({"status": "skipped", "message": "No lead_id associated with this call"})
 
     callback_datetime = f"{args['callback_date']}T{args['callback_time']}:00"
-    payload = {
+    disposition_args = {
         "disposition": "connected_call_back",
         "notes": args.get("notes", "Callback requested during AI conversation"),
         "callback_datetime": callback_datetime,
     }
+    result_json = await _set_disposition(workspace_id, lead_id, disposition_args, auth_header)
     try:
-        resp = requests.post(
-            f"{BACKEND_URL}/api/v1/leads/{lead_id}/dispose",
-            headers=_backend_headers(workspace_id),
-            json=payload,
-            timeout=10,
-        )
-        if resp.ok:
-            return json.dumps({"status": "success", "callback_scheduled": callback_datetime})
-        return json.dumps({"status": "error", "message": resp.text[:200]})
-    except Exception as e:
-        return json.dumps({"status": "error", "message": str(e)})
+        result = json.loads(result_json)
+    except Exception:
+        return result_json
+    if result.get("status") == "success":
+        result["callback_scheduled"] = callback_datetime
+    return json.dumps(result)
 
 
-async def _log_summary(workspace_id: str, lead_id: Optional[str], args: dict) -> str:
+async def _log_summary(
+    workspace_id: str,
+    lead_id: Optional[str],
+    args: dict,
+    auth_header: Optional[str],
+) -> str:
     if not lead_id:
-        return json.dumps({"status": "skipped", "message": "No lead_id — summary logged locally only"})
+        return json.dumps({"status": "skipped", "message": "No lead_id - summary logged locally only"})
 
     payload = {
         "lead_id": lead_id,
@@ -204,7 +225,7 @@ async def _log_summary(workspace_id: str, lead_id: Optional[str], args: dict) ->
     try:
         resp = requests.post(
             f"{BACKEND_URL}/api/v1/activities/",
-            headers=_backend_headers(workspace_id),
+            headers=_backend_headers(workspace_id, auth_header),
             json=payload,
             timeout=10,
         )
