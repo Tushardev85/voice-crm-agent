@@ -47,6 +47,8 @@ CRM_TOOLS = [
                             "no_answer",
                             "left_voicemail",
                             "busy",
+                            "bad_number",
+                            "do_not_call",
                             "connected_call_back",
                             "connected_qualified",
                             "connected_not_interested",
@@ -57,6 +59,26 @@ CRM_TOOLS = [
                     "notes": {
                         "type": "string",
                         "description": "Brief summary of the conversation.",
+                    },
+                    "has_budget": {
+                        "type": "boolean",
+                        "description": "Required when disposition is connected_qualified.",
+                    },
+                    "has_authority": {
+                        "type": "boolean",
+                        "description": "Required when disposition is connected_qualified.",
+                    },
+                    "has_need": {
+                        "type": "boolean",
+                        "description": "Required when disposition is connected_qualified.",
+                    },
+                    "has_timing": {
+                        "type": "boolean",
+                        "description": "Required when disposition is connected_qualified.",
+                    },
+                    "estimated_value": {
+                        "type": "number",
+                        "description": "Optional estimated opportunity value when qualified.",
                     },
                 },
                 "required": ["disposition"],
@@ -158,6 +180,14 @@ async def _set_disposition(
     if not lead_id:
         return json.dumps({"status": "skipped", "message": "No lead_id associated with this call"})
 
+    if args["disposition"] == "connected_qualified":
+        required_bant = ("has_budget", "has_authority", "has_need", "has_timing")
+        if any(key not in args for key in required_bant):
+            return json.dumps({
+                "status": "error",
+                "message": "Budget, Authority, Need, and Timing are required for connected_qualified",
+            })
+
     payload = {
         "lead_id": lead_id,
         "channel": "call",
@@ -167,6 +197,11 @@ async def _set_disposition(
     }
     if args.get("callback_datetime"):
         payload["callback_datetime"] = args["callback_datetime"]
+    for key in ("has_budget", "has_authority", "has_need", "has_timing", "estimated_value"):
+        if key in args:
+            payload[key] = args[key]
+    if args["disposition"] == "connected_qualified":
+        payload["currency"] = args.get("currency", "USD")
 
     try:
         resp = requests.post(

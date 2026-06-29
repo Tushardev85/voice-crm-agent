@@ -87,7 +87,7 @@ async def run_bot(
             "Use exactly one disposition path: "
             "1) If lead asks for callback, call schedule_callback(callback_date, callback_time, notes) and do not call set_call_disposition after that. "
             "2) If lead is not interested, call set_call_disposition with disposition='connected_not_interested'. "
-            "3) If lead is interested and clearly satisfies BANT (budget, authority, need, timing), call set_call_disposition with disposition='connected_qualified'. "
+            "3) If lead is interested and clearly satisfies BANT (budget, authority, need, timing), call set_call_disposition with disposition='connected_qualified' and include has_budget=true, has_authority=true, has_need=true, and has_timing=true. "
             "4) If lead is interested but does not satisfy BANT, call set_call_disposition with disposition='connected_disqualified'. "
             "If outcome is still unclear, ask follow-up questions before ending the call."
         )
