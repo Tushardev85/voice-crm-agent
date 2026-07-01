@@ -47,6 +47,8 @@ CRM_TOOLS = [
                             "no_answer",
                             "left_voicemail",
                             "busy",
+                            "bad_number",
+                            "do_not_call",
                             "connected_call_back",
                             "connected_qualified",
                             "connected_not_interested",
@@ -57,6 +59,30 @@ CRM_TOOLS = [
                     "notes": {
                         "type": "string",
                         "description": "Brief summary of the conversation.",
+                    },
+                    "has_budget": {
+                        "type": "boolean",
+                        "description": "True only when the lead confirms budget.",
+                    },
+                    "has_authority": {
+                        "type": "boolean",
+                        "description": "True only when the lead has buying authority.",
+                    },
+                    "has_need": {
+                        "type": "boolean",
+                        "description": "True only when the lead confirms a relevant need.",
+                    },
+                    "has_timing": {
+                        "type": "boolean",
+                        "description": "True only when the lead has a clear buying timeline.",
+                    },
+                    "estimated_value": {
+                        "type": "number",
+                        "description": "Optional estimated opportunity value.",
+                    },
+                    "currency": {
+                        "type": "string",
+                        "description": "Three-letter currency code for estimated_value.",
                     },
                 },
                 "required": ["disposition"],
@@ -167,6 +193,16 @@ async def _set_disposition(
     }
     if args.get("callback_datetime"):
         payload["callback_datetime"] = args["callback_datetime"]
+    for field in (
+        "has_budget",
+        "has_authority",
+        "has_need",
+        "has_timing",
+        "estimated_value",
+        "currency",
+    ):
+        if field in args:
+            payload[field] = args[field]
 
     try:
         resp = requests.post(
