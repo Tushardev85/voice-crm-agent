@@ -62,7 +62,6 @@ CRM_TOOLS = [
                     },
                     "has_budget": {
                         "type": "boolean",
-<<<<<<< HEAD
                         "description": "True only when the lead confirms budget.",
                     },
                     "has_authority": {
@@ -84,25 +83,6 @@ CRM_TOOLS = [
                     "currency": {
                         "type": "string",
                         "description": "Three-letter currency code for estimated_value.",
-=======
-                        "description": "Required when disposition is connected_qualified.",
-                    },
-                    "has_authority": {
-                        "type": "boolean",
-                        "description": "Required when disposition is connected_qualified.",
-                    },
-                    "has_need": {
-                        "type": "boolean",
-                        "description": "Required when disposition is connected_qualified.",
-                    },
-                    "has_timing": {
-                        "type": "boolean",
-                        "description": "Required when disposition is connected_qualified.",
-                    },
-                    "estimated_value": {
-                        "type": "number",
-                        "description": "Optional estimated opportunity value when qualified.",
->>>>>>> b4796d720025c8799a53827627db54e3ce975976
                     },
                 },
                 "required": ["disposition"],
@@ -221,7 +201,6 @@ async def _set_disposition(
     }
     if args.get("callback_datetime"):
         payload["callback_datetime"] = args["callback_datetime"]
-<<<<<<< HEAD
     for field in (
         "has_budget",
         "has_authority",
@@ -232,13 +211,8 @@ async def _set_disposition(
     ):
         if field in args:
             payload[field] = args[field]
-=======
-    for key in ("has_budget", "has_authority", "has_need", "has_timing", "estimated_value"):
-        if key in args:
-            payload[key] = args[key]
     if args["disposition"] == "connected_qualified":
         payload["currency"] = args.get("currency", "USD")
->>>>>>> b4796d720025c8799a53827627db54e3ce975976
 
     try:
         resp = requests.post(
