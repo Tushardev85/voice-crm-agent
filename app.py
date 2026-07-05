@@ -10,9 +10,10 @@ from fastapi import (
     WebSocket,
     Request,
     Response,
+    BackgroundTasks,
 )
 from fastapi.middleware.cors import CORSMiddleware
-from starlette.responses import HTMLResponse, JSONResponse
+from starlette.responses import HTMLResponse
 from utils.logging import logger
 from utils.redis_client import RedisClient
 from twilio.rest import Client
@@ -36,6 +37,22 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+def _forward_call_status_webhook(
+    target_url: str,
+    raw_body: bytes,
+    content_type: str,
+) -> None:
+    try:
+        requests.post(
+            target_url,
+            data=raw_body,
+            headers={"content-type": content_type},
+            timeout=10,
+        )
+    except Exception as e:
+        print(f"Failed to proxy Twilio webhook to backend: {e}")
 
 
 @app.get("/")
@@ -72,7 +89,10 @@ async def agent(request: Request):
 
 
 @app.post("/api/v1/call/webhook")
-async def proxy_call_status_webhook(request: Request):
+async def proxy_call_status_webhook(
+    request: Request,
+    background_tasks: BackgroundTasks,
+):
     """
     Relay Twilio status callbacks to voice-crm backend.
     This allows using a single public ngrok URL (agent) while backend runs locally.
@@ -82,30 +102,17 @@ async def proxy_call_status_webhook(request: Request):
     ).rstrip("/")
     target_url = f"{backend_base}/api/v1/call/webhook"
 
-    try:
-        raw_body = await request.body()
-        content_type = request.headers.get(
-            "content-type", "application/x-www-form-urlencoded"
-        )
-        forwarded = requests.post(
-            target_url,
-            data=raw_body,
-            headers={"content-type": content_type},
-            timeout=10,
-        )
-        return Response(
-            content=forwarded.text,
-            status_code=forwarded.status_code,
-            media_type=forwarded.headers.get(
-                "content-type", "application/json"
-            ),
-        )
-    except Exception as e:
-        print(f"Failed to proxy Twilio webhook to backend: {e}")
-        return JSONResponse(
-            status_code=502,
-            content={"detail": "Failed to proxy call webhook to backend"},
-        )
+    raw_body = await request.body()
+    content_type = request.headers.get(
+        "content-type", "application/x-www-form-urlencoded"
+    )
+    background_tasks.add_task(
+        _forward_call_status_webhook,
+        target_url,
+        raw_body,
+        content_type,
+    )
+    return Response(status_code=204)
 
 
 @app.websocket("/ws")
